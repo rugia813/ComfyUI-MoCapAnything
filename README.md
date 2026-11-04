@@ -2,11 +2,25 @@
 
 Local [MoCapAnything V2](https://github.com/phongdaot/MocapAnything) motion capture: video frames and a reference skeleton → joint positions, local rotations, and BVH animation.
 
-Four V3 nodes: **Load MoCapAnything V2**, **Load MoCapAnything Reference**, **MoCapAnything Capture**, and **Save MoCapAnything Motion**. The workflow reuses native **Load Video**, **Get Video Components**, and **CLIP Vision Loader**. No additional Python dependencies, background downloads, web services, or Blender installation are required.
+Four V3 nodes: **Load MoCapAnything V2**, **Load MoCapAnything Reference**, **MoCapAnything Capture**, and **Save MoCapAnything Motion**. The workflow reuses native **Load Video**, **Get Video Components**, and **CLIP Vision Loader**. Python dependencies are declared in `requirements.txt` and `pyproject.toml`. No background downloads, web services, or Blender installation are required.
 
 ## Install
 
-Put this directory in `ComfyUI/custom_nodes/ComfyUI-MoCapAnything` and restart ComfyUI. Requires Python 3.11+ and a current ComfyUI with V3 schemas, native DINOv2-Large, `AttentionTensorContainer`, `ComfyAttention`, and `comfy.model_prefetch`. Older ComfyUI versions are not supported.
+Install ComfyUI first, including the PyTorch build appropriate for your hardware. Put this directory in `ComfyUI/custom_nodes/ComfyUI-MoCapAnything`. Requires Python 3.11+ and a current ComfyUI with V3 schemas, native DINOv2-Large, `AttentionTensorContainer`, `ComfyAttention`, and `comfy.model_prefetch`. Older ComfyUI versions are not supported; installing Python dependencies does not provide these ComfyUI APIs.
+
+Install this package's dependencies in **ComfyUI's Python environment**, then restart ComfyUI. From this node directory, with ComfyUI's virtual environment activated:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+For Windows portable, run this from the node directory instead:
+
+```powershell
+& "..\..\..\python_embeded\python.exe" -m pip install -r requirements.txt
+```
+
+This installs missing dependencies and retains already-satisfied packages. Torch and torchvision are not pinned to a particular CUDA/platform build. On a new installation, follow ComfyUI's hardware-specific PyTorch setup before running this command.
 
 Use ComfyUI's Python for the commands below; Windows portable installations use `python_embeded/python.exe`. Run conversion commands from this node directory.
 
