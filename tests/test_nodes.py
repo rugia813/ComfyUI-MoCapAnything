@@ -10,6 +10,7 @@ from unittest.mock import patch
 import bootstrap
 import numpy as np
 import torch
+from safetensors.torch import load_file
 from scipy.spatial.transform import Rotation
 
 from mocap_extension.motion import load_reference, Motion, rotation_matrices, write_bvh, read_bvh_skeleton
@@ -64,6 +65,22 @@ class NodeTests(unittest.TestCase):
                 self.assertEqual(input["link"], link_id)
                 self.assertIn(link_id, nodes[source]["outputs"][output]["links"])
                 self.assertEqual(nodes[source]["outputs"][output]["type"], socket_type)
+
+    def test_model_loader_converts_original_checkpoint_once(self):
+        models = self.root / "models"
+        models.mkdir()
+        source = models / "video2pos2rot_epoch60.pt"
+        torch.save({"model_state": {"module.video2pos.weight": torch.ones(1),
+                                    "module.pos2rot.weight": torch.ones(1)}}, source)
+        converted = source.with_suffix(".safetensors")
+        with patch("folder_paths.get_full_path_or_raise", return_value=str(source)), \
+             patch("folder_paths.get_folder_paths", return_value=[str(models)]), \
+             patch("mocap_extension.nodes.load_model", return_value="loaded") as load:
+            self.assertEqual(LoadMoCapAnything.execute(source.name).result[0], "loaded")
+            self.assertEqual(load.call_args.args[0], str(converted))
+            self.assertEqual(set(load_file(str(converted))), {"video2pos.weight", "pos2rot.weight"})
+            with patch("mocap_extension.nodes.convert_checkpoint", side_effect=AssertionError("converted twice")):
+                LoadMoCapAnything.execute(source.name)
 
     def test_reference_containment_and_cache(self):
         with patch("folder_paths.get_input_directory", return_value=str(self.input)):

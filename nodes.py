@@ -1,6 +1,7 @@
 from pathlib import Path
 import hashlib
 import os
+import tempfile
 
 import numpy as np
 import folder_paths
@@ -10,6 +11,7 @@ from .motion import load_reference, write_bvh
 from .pipeline import load_model, capture
 from .preview import skeleton_glb
 from .rig import prepare_rig, animate_rig
+from .tools.convert_checkpoint import convert as convert_checkpoint
 
 
 MoCapModel = io.Custom("MOCAPANYTHING_MODEL")
@@ -33,17 +35,41 @@ class LoadMoCapAnything(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="MoCapAnything_LoadModel", display_name="Load MoCapAnything V2", category="MoCapAnything",
-            description="Load the converted V2 checkpoint from models/diffusion_models. Runs locally in float32.",
-            inputs=[io.Combo.Input("model_name", options=[name for name in folder_paths.get_filename_list("diffusion_models") if name.lower().endswith(".safetensors")])],
+            description="Load a V2 .pt or .safetensors checkpoint. A .pt file is converted once beside the original.",
+            inputs=[io.Combo.Input("model_name", options=[name for name in folder_paths.get_filename_list("diffusion_models") if name.lower().endswith((".pt", ".safetensors"))])],
             outputs=[MoCapModel.Output("model")],
         )
 
     @classmethod
     def execute(cls, model_name):
-        path = folder_paths.get_full_path_or_raise("diffusion_models", model_name)
-        if Path(path).suffix.lower() != ".safetensors" or not any(folder_paths.is_within_directory(root, path) for root in folder_paths.get_folder_paths("diffusion_models")):
-            raise ValueError("Select a safetensors checkpoint inside a configured diffusion_models folder.")
-        return io.NodeOutput(load_model(path))
+        path = cls.model_path(model_name)
+        if path.suffix.lower() == ".pt":
+            converted = path.with_suffix(".safetensors")
+            if not converted.exists() or converted.stat().st_mtime_ns < path.stat().st_mtime_ns:
+                fd, temporary = tempfile.mkstemp(suffix=".safetensors", dir=path.parent)
+                os.close(fd)
+                try:
+                    convert_checkpoint(path, temporary)
+                    os.replace(temporary, converted)
+                finally:
+                    Path(temporary).unlink(missing_ok=True)
+            path = converted
+        return io.NodeOutput(load_model(str(path)))
+
+    @classmethod
+    def model_path(cls, model_name):
+        path = Path(folder_paths.get_full_path_or_raise("diffusion_models", model_name))
+        if path.suffix.lower() not in (".pt", ".safetensors") or not any(
+            folder_paths.is_within_directory(root, str(path)) for root in folder_paths.get_folder_paths("diffusion_models")
+        ):
+            raise ValueError("Select a .pt or .safetensors checkpoint inside a configured diffusion_models folder.")
+        return path
+
+    @classmethod
+    def fingerprint_inputs(cls, model_name):
+        path = cls.model_path(model_name)
+        stat = path.stat()
+        return (stat.st_size, stat.st_mtime_ns)
 
 
 class LoadMoCapReference(io.ComfyNode):

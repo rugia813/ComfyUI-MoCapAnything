@@ -54,13 +54,11 @@ async def main():
     for module in (nodes_video, nodes_load_3d):
         for cls in await (await module.comfy_entrypoint()).get_node_list():
             nodes.NODE_CLASS_MAPPINGS[cls.GET_SCHEMA().node_id] = cls
-    name = 'custom_rig_to_3d.json' if len(sys.argv) > 1 else 'video_to_bvh.json'
-    prompt = prompt_from_workflow(bootstrap.ROOT / 'example_workflows' / name)
-    if len(sys.argv) > 1:
-        (inputs / '3d').mkdir(exist_ok=True)
-        shutil.copy2(bootstrap.ROOT / 'test_outputs/rig_fixtures/character.glb', inputs / '3d/character.glb')
-        prompt['11']['inputs']['model_file'] = '3d/character.glb'
-    prompt["4"]["inputs"]["model_name"] = "mocapanything_v2.safetensors"
+    prompt = prompt_from_workflow(bootstrap.ROOT / 'example_workflows/custom_rig_to_3d.json')
+    (inputs / '3d').mkdir(exist_ok=True)
+    shutil.copy2(bootstrap.ROOT / 'test_outputs/rig_fixtures/character.glb', inputs / '3d/character.glb')
+    prompt['11']['inputs']['model_file'] = '3d/character.glb'
+    prompt["4"]["inputs"]["model_name"] = "video2pos2rot_epoch60.pt"
     valid, error, outputs, node_errors = await execution.validate_prompt("mocap-test", prompt, None)
     assert valid, (error, node_errors)
     executor = execution.PromptExecutor(EventSink(), cache_type=execution.CacheType.CLASSIC, cache_args={"ram": 0, "ram_inactive": 0})

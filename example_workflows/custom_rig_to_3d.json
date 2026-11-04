@@ -185,7 +185,7 @@
         "Node name for S&R": "MoCapAnything_LoadModel"
       },
       "widgets_values": [
-        "mocapanything/mocapanything_v2.safetensors"
+        "mocapanything/video2pos2rot_epoch60.pt"
       ]
     },
     {
