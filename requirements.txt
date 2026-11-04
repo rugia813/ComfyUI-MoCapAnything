@@ -1,0 +1,2 @@
+# Uses the torch, numpy, scipy, Pillow, transformers and safetensors supplied by ComfyUI.
+# No additional dependencies.

@@ -1,0 +1,9 @@
+[project]
+name = "comfyui-mocapanything"
+version = "0.1.0"
+description = "Local MoCapAnything V2 video-to-skeleton motion capture and BVH export for ComfyUI"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+
+[tool.comfy]
+DisplayName = "MoCapAnything V2"

@@ -1,0 +1,72 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "hamster.mp4"
+    }
+  },
+  "2": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "1",
+        0
+      ]
+    }
+  },
+  "3": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "dinov2-large.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "MoCapAnything_LoadModel",
+    "inputs": {
+      "model_name": "mocapanything/mocapanything_v2.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "MoCapAnything_LoadReference",
+    "inputs": {
+      "reference_name": "hamster.npz"
+    }
+  },
+  "6": {
+    "class_type": "MoCapAnything_Capture",
+    "inputs": {
+      "model": [
+        "4",
+        0
+      ],
+      "clip_vision": [
+        "3",
+        0
+      ],
+      "reference": [
+        "5",
+        0
+      ],
+      "images": [
+        "2",
+        0
+      ],
+      "fps": [
+        "2",
+        2
+      ],
+      "batch_size": 8,
+      "chunk_size": 64
+    }
+  },
+  "7": {
+    "class_type": "MoCapAnything_SaveMotion",
+    "inputs": {
+      "motion": [
+        "6",
+        0
+      ],
+      "filename_prefix": "mocapanything/hamster"
+    }
+  }
+}
