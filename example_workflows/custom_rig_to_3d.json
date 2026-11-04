@@ -1,0 +1,973 @@
+{
+  "last_node_id": 14,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [
+        30,
+        80
+      ],
+      "size": [
+        330,
+        310
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "file",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "file"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "hamster.mp4"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "GetVideoComponents",
+      "pos": [
+        410,
+        80
+      ],
+      "size": [
+        250,
+        150
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "links": [
+            3
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "bit_depth",
+          "type": "COMBO",
+          "links": null,
+          "slot_index": 3
+        },
+        {
+          "name": "color_space",
+          "type": "COMBO",
+          "links": null,
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetVideoComponents"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 3,
+      "type": "CLIPVisionLoader",
+      "pos": [
+        30,
+        470
+      ],
+      "size": [
+        410,
+        90
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "clip_name"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP_VISION",
+          "type": "CLIP_VISION",
+          "links": [
+            4,
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPVisionLoader"
+      },
+      "widgets_values": [
+        "dinov2-large.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "MoCapAnything_LoadModel",
+      "pos": [
+        30,
+        620
+      ],
+      "size": [
+        410,
+        90
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "model_name"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MOCAPANYTHING_MODEL",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoCapAnything_LoadModel"
+      },
+      "widgets_values": [
+        "mocapanything/mocapanything_v2.safetensors"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "MoCapAnything_Capture",
+      "pos": [
+        1200,
+        250
+      ],
+      "size": [
+        330,
+        270
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MOCAPANYTHING_MODEL",
+          "link": 5
+        },
+        {
+          "name": "clip_vision",
+          "type": "CLIP_VISION",
+          "link": 4
+        },
+        {
+          "name": "reference",
+          "type": "MOCAPANYTHING_REFERENCE",
+          "link": 6
+        },
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "link": 3,
+          "widget": {
+            "name": "fps"
+          }
+        },
+        {
+          "name": "batch_size",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "batch_size"
+          }
+        },
+        {
+          "name": "chunk_size",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "chunk_size"
+          }
+        },
+        {
+          "name": "foreground_mask",
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "motion",
+          "type": "MOCAPANYTHING_MOTION",
+          "links": [
+            7,
+            8,
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoCapAnything_Capture"
+      },
+      "widgets_values": [
+        30,
+        8,
+        64
+      ]
+    },
+    {
+      "id": 7,
+      "type": "MoCapAnything_SaveMotion",
+      "pos": [
+        1600,
+        70
+      ],
+      "size": [
+        350,
+        200
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "motion",
+          "type": "MOCAPANYTHING_MOTION",
+          "link": 7
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "filename_prefix"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "bvh_path",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "npz_path",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoCapAnything_SaveMotion"
+      },
+      "widgets_values": [
+        "mocapanything/hamster"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "Note",
+      "pos": [
+        30,
+        1200
+      ],
+      "size": [
+        1000,
+        280
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "properties": {},
+      "widgets_values": [
+        "Custom rig workflow (experimental):\n1. In Load 3D (Advanced), select a rigged FBX, GLB or glTF with one skeleton/root.\n2. CLIP Loader: google-t5/t5-base model.safetensors renamed t5-base.safetensors; type stable_audio.\n3. Install Blender 4.2+; the node detects it automatically. No path setup is needed.\n4. Set forward_axis to the facing direction seen in Load 3D (Y-up coordinates).\n5. Select your video, DINOv2-Large and MoCapAnything checkpoint.\nThe prepared reference feeds Capture; the SAME prepared rig feeds Animate Rig.\nThe viewers show the skeleton and skinned mesh. Use Play in their animation controls.\nReference features come from one rest pose: motion quality and scale can differ from upstream dataset preparation.\nConnect reference_image to Preview Image to inspect preparation. Connect model_3d to native Save 3D to export GLB."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 9,
+      "type": "MoCapAnything_Skeleton3D",
+      "pos": [
+        1600,
+        280
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "motion",
+          "type": "MOCAPANYTHING_MOTION",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D_GLB",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoCapAnything_Skeleton3D"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "Preview3DAdvanced",
+      "pos": [
+        2050,
+        70
+      ],
+      "size": [
+        560,
+        600
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D",
+          "link": 9
+        },
+        {
+          "name": "model_3d_info",
+          "type": "LOAD3D_MODEL_INFO",
+          "link": null
+        },
+        {
+          "name": "viewport_state",
+          "type": "LOAD_3D",
+          "link": null,
+          "widget": {
+            "name": "viewport_state"
+          }
+        },
+        {
+          "name": "camera_info",
+          "type": "LOAD3D_CAMERA",
+          "link": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "model_3d_info",
+          "type": "LOAD3D_MODEL_INFO",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "camera_info",
+          "type": "LOAD3D_CAMERA",
+          "links": null,
+          "slot_index": 2
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "slot_index": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Preview3DAdvanced"
+      },
+      "widgets_values": [
+        {},
+        512,
+        512
+      ]
+    },
+    {
+      "id": 5,
+      "type": "MoCapAnything_PrepareRig",
+      "pos": [
+        740,
+        650
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D",
+          "link": 10
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 11
+        },
+        {
+          "name": "clip_vision",
+          "type": "CLIP_VISION",
+          "link": 12
+        },
+        {
+          "name": "forward_axis",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "forward_axis"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "reference",
+          "type": "MOCAPANYTHING_REFERENCE",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "rig",
+          "type": "MOCAPANYTHING_RIG",
+          "links": [
+            14
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "reference_image",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoCapAnything_PrepareRig"
+      },
+      "widgets_values": [
+        "+Z"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "Load3DAdvanced",
+      "pos": [
+        30,
+        720
+      ],
+      "size": [
+        550,
+        420
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_file",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "model_file"
+          }
+        },
+        {
+          "name": "viewport_state",
+          "type": "LOAD_3D",
+          "link": null,
+          "widget": {
+            "name": "viewport_state"
+          }
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "model_3d_info",
+          "type": "LOAD3D_MODEL_INFO",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "camera_info",
+          "type": "LOAD3D_CAMERA",
+          "links": null,
+          "slot_index": 2
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "slot_index": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Load3DAdvanced"
+      },
+      "widgets_values": [
+        "none",
+        {},
+        512,
+        512
+      ]
+    },
+    {
+      "id": 12,
+      "type": "CLIPLoader",
+      "pos": [
+        740,
+        500
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "clip_name"
+          }
+        },
+        {
+          "name": "type",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "type"
+          }
+        },
+        {
+          "name": "device",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "device"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "t5-base.safetensors",
+        "stable_audio",
+        "default"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "MoCapAnything_AnimateRig",
+      "pos": [
+        1600,
+        550
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "motion",
+          "type": "MOCAPANYTHING_MOTION",
+          "link": 13
+        },
+        {
+          "name": "rig",
+          "type": "MOCAPANYTHING_RIG",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D_GLB",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoCapAnything_AnimateRig"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 14,
+      "type": "Preview3DAdvanced",
+      "pos": [
+        2050,
+        750
+      ],
+      "size": [
+        560,
+        600
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D",
+          "link": 15
+        },
+        {
+          "name": "model_3d_info",
+          "type": "LOAD3D_MODEL_INFO",
+          "link": null
+        },
+        {
+          "name": "viewport_state",
+          "type": "LOAD_3D",
+          "link": null,
+          "widget": {
+            "name": "viewport_state"
+          }
+        },
+        {
+          "name": "camera_info",
+          "type": "LOAD3D_CAMERA",
+          "link": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model_3d",
+          "type": "FILE_3D",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "model_3d_info",
+          "type": "LOAD3D_MODEL_INFO",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "camera_info",
+          "type": "LOAD3D_CAMERA",
+          "links": null,
+          "slot_index": 2
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "slot_index": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Preview3DAdvanced"
+      },
+      "widgets_values": [
+        {},
+        512,
+        512
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "VIDEO"
+    ],
+    [
+      2,
+      2,
+      0,
+      6,
+      3,
+      "IMAGE"
+    ],
+    [
+      3,
+      2,
+      2,
+      6,
+      4,
+      "FLOAT"
+    ],
+    [
+      4,
+      3,
+      0,
+      6,
+      1,
+      "CLIP_VISION"
+    ],
+    [
+      5,
+      4,
+      0,
+      6,
+      0,
+      "MOCAPANYTHING_MODEL"
+    ],
+    [
+      6,
+      5,
+      0,
+      6,
+      2,
+      "MOCAPANYTHING_REFERENCE"
+    ],
+    [
+      7,
+      6,
+      0,
+      7,
+      0,
+      "MOCAPANYTHING_MOTION"
+    ],
+    [
+      8,
+      6,
+      0,
+      9,
+      0,
+      "MOCAPANYTHING_MOTION"
+    ],
+    [
+      9,
+      9,
+      0,
+      10,
+      0,
+      "FILE_3D_GLB"
+    ],
+    [
+      10,
+      11,
+      0,
+      5,
+      0,
+      "FILE_3D"
+    ],
+    [
+      11,
+      12,
+      0,
+      5,
+      1,
+      "CLIP"
+    ],
+    [
+      12,
+      3,
+      0,
+      5,
+      2,
+      "CLIP_VISION"
+    ],
+    [
+      13,
+      6,
+      0,
+      13,
+      0,
+      "MOCAPANYTHING_MOTION"
+    ],
+    [
+      14,
+      5,
+      1,
+      13,
+      1,
+      "MOCAPANYTHING_RIG"
+    ],
+    [
+      15,
+      13,
+      0,
+      14,
+      0,
+      "FILE_3D_GLB"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8,
+      "offset": [
+        70,
+        20
+      ]
+    }
+  },
+  "version": 0.4
+}

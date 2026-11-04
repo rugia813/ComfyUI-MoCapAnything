@@ -4,10 +4,13 @@ The inference model in `model/` is adapted from [phongdaot/MocapAnything](https:
 
 Changes remove training and download paths, preserve checkpoint keys, use ComfyUI operations/attention/prefetch, and provide a local inference integration. The graph biases and temporal boundary behavior follow that revision. Native ComfyUI supplies DINOv2 and the optimized RoPE implementation.
 
+Joint name cleanup and topology relations in `rig.py` are adapted from upstream's `preprocess/build_species_info.py` under the same license. Custom-rig preparation uses a single rest pose instead of upstream's animation dataset. Native ComfyUI supplies T5-base and GLB serialization helpers. Blender is an optional external application, not bundled.
+
 Weights and reference data are separate downloads and are not included in this source package:
 
 - [MoCapAnything V2 weights](https://huggingface.co/kehong/MoCapAnythingV2-weights)
 - [DINOv2-Large](https://huggingface.co/facebook/dinov2-large)
+- [Google T5-base](https://huggingface.co/google-t5/t5-base), for custom-rig joint-name features
 - [MoCapAnything example data](https://huggingface.co/datasets/kehong/MoCapAnythingV2-data-sample); animal assets derive from Truebones Zoo and retain their own terms.
 
 No BRIA RMBG, SAM2, TripoSG, Gradio, Blender, or upstream training implementation is bundled. Use a separately installed foreground-mask node when needed.

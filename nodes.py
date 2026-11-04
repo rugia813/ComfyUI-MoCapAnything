@@ -8,11 +8,14 @@ from comfy_api.latest import io, ui
 
 from .motion import load_reference, write_bvh
 from .pipeline import load_model, capture
+from .preview import skeleton_glb
+from .rig import prepare_rig, animate_rig
 
 
 MoCapModel = io.Custom("MOCAPANYTHING_MODEL")
 MoCapReference = io.Custom("MOCAPANYTHING_REFERENCE")
 MoCapMotion = io.Custom("MOCAPANYTHING_MOTION")
+MoCapRig = io.Custom("MOCAPANYTHING_RIG")
 
 
 def reference_path(name):
@@ -114,3 +117,50 @@ class SaveMoCapMotion(io.ComfyNode):
                                 parents=motion.reference.parents, offsets=motion.reference.offsets,
                                 names=np.asarray(motion.reference.names), fps=motion.fps)
         return io.NodeOutput(str(bvh_path), str(npz_path), ui=ui.PreviewText(str(bvh_path)))
+
+
+class PrepareMoCapRig(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MoCapAnything_PrepareRig", display_name="Prepare MoCapAnything Rig Reference", category="MoCapAnything",
+            is_experimental=True,
+            description="Build a reference from a rigged FBX/GLB/glTF rest pose. Requires Blender 4.2+, native T5-base CLIP and DINOv2-Large. Single-rest-pose scale/static-joint estimation differs from upstream's animation-dataset preparation.",
+            inputs=[io.File3DAny.Input("model_3d"), io.Clip.Input("clip"), io.ClipVision.Input("clip_vision"),
+                    io.Combo.Input("forward_axis", options=["+Z", "-Z", "+X", "-X"], default="+Z",
+                                   tooltip="Character's facing direction in the native 3D viewer's Y-up coordinates.")],
+            outputs=[MoCapReference.Output("reference"), MoCapRig.Output("rig"), io.Image.Output("reference_image")],
+        )
+
+    @classmethod
+    def execute(cls, model_3d, clip, clip_vision, forward_axis="+Z"):
+        return io.NodeOutput(*prepare_rig(model_3d, clip, clip_vision, forward_axis))
+
+
+class AnimateMoCapRig(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MoCapAnything_AnimateRig", display_name="Animate MoCapAnything Rig", category="MoCapAnything",
+            description="Apply captured rotations to the same prepared rig, preserving its mesh and skin weights. Connect model_3d to Preview 3D (Advanced) or Save 3D.",
+            inputs=[MoCapMotion.Input("motion"), MoCapRig.Input("rig")],
+            outputs=[io.File3DGLB.Output("model_3d")],
+        )
+
+    @classmethod
+    def execute(cls, motion, rig):
+        return io.NodeOutput(animate_rig(motion, rig))
+
+
+class MoCapSkeleton3D(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MoCapAnything_Skeleton3D", display_name="MoCapAnything Motion to 3D Skeleton", category="MoCapAnything",
+            description="Animated GLB bone geometry using the same rotations and offsets as BVH. Connect to Preview 3D (Advanced). No Blender required.",
+            inputs=[MoCapMotion.Input("motion")], outputs=[io.File3DGLB.Output("model_3d")],
+        )
+
+    @classmethod
+    def execute(cls, motion):
+        return io.NodeOutput(skeleton_glb(motion))

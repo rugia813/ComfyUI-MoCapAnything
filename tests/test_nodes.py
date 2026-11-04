@@ -49,21 +49,21 @@ class NodeTests(unittest.TestCase):
         spec.loader.exec_module(extension)
         entry = asyncio.run(extension.comfy_entrypoint())
         classes = asyncio.run(entry.get_node_list())
-        self.assertEqual(len(classes), 4)
+        self.assertEqual(len(classes), 7)
         for cls in classes:
             schema = cls.define_schema()
             self.assertTrue(schema.node_id.startswith("MoCapAnything_"))
             self.assertIsInstance(cls.INPUT_TYPES(), dict)
 
-    def test_frontend_workflow_matches_api_links(self):
-        workflow = json.loads((bootstrap.ROOT / "example_workflows/video_to_bvh.json").read_text())
-        api = json.loads((bootstrap.ROOT / "example_workflows/video_to_bvh.api.json").read_text())
-        nodes = {node["id"]: node for node in workflow["nodes"]}
-        for link_id, source, output, destination, input_slot, socket_type in workflow["links"]:
-            input = nodes[destination]["inputs"][input_slot]
-            self.assertEqual(input["link"], link_id)
-            self.assertEqual(api[str(destination)]["inputs"][input["name"]], [str(source), output])
-            self.assertEqual(nodes[source]["outputs"][output]["type"], socket_type)
+    def test_frontend_workflow_links(self):
+        for path in (bootstrap.ROOT / 'example_workflows').glob('*.json'):
+            workflow = json.loads(path.read_text())
+            nodes = {node["id"]: node for node in workflow["nodes"]}
+            for link_id, source, output, destination, input_slot, socket_type in workflow["links"]:
+                input = nodes[destination]["inputs"][input_slot]
+                self.assertEqual(input["link"], link_id)
+                self.assertIn(link_id, nodes[source]["outputs"][output]["links"])
+                self.assertEqual(nodes[source]["outputs"][output]["type"], socket_type)
 
     def test_reference_containment_and_cache(self):
         with patch("folder_paths.get_input_directory", return_value=str(self.input)):
