@@ -13,7 +13,7 @@ from safetensors.torch import load_file
 from scipy.spatial.transform import Rotation
 
 from mocap_extension.motion import load_reference, rotation_matrices
-from mocap_extension.nodes import LoadMoCapAnything, LoadMoCapReference, reference_path
+from mocap_extension.nodes import LoadMoCapAnything
 from mocap_extension.pipeline import prepare_frames, make_batch
 
 
@@ -49,7 +49,7 @@ class NodeTests(unittest.TestCase):
         spec.loader.exec_module(extension)
         entry = asyncio.run(extension.comfy_entrypoint())
         classes = asyncio.run(entry.get_node_list())
-        self.assertEqual(len(classes), 6)
+        self.assertEqual(len(classes), 5)
         for cls in classes:
             schema = cls.define_schema()
             self.assertTrue(schema.node_id.startswith("MoCapAnything_"))
@@ -80,17 +80,6 @@ class NodeTests(unittest.TestCase):
             self.assertEqual(set(load_file(str(converted))), {"video2pos.weight", "pos2rot.weight"})
             with patch("mocap_extension.nodes.convert_checkpoint", side_effect=AssertionError("converted twice")):
                 LoadMoCapAnything.execute(source.name)
-
-    def test_reference_containment_and_cache(self):
-        with patch("folder_paths.get_input_directory", return_value=str(self.input)):
-            self.assertEqual(reference_path("test.npz"), self.path)
-            for name in ("../escape.npz", "../../outside.npz", str(self.root / "escape.npz"), "test.pkl"):
-                with self.assertRaises(ValueError):
-                    reference_path(name)
-            fingerprint = LoadMoCapReference.fingerprint_inputs("test.npz")
-            with self.path.open("ab") as file:
-                file.write(b"changed")
-            self.assertNotEqual(fingerprint, LoadMoCapReference.fingerprint_inputs("test.npz"))
 
     def test_reject_pickled_reference(self):
         np.savez(self.path, names=np.array([{"unsafe": True}], dtype=object))

@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import shutil
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bootstrap
 import folder_paths
 import nodes
@@ -20,10 +21,11 @@ def prompt_from_workflow(path):
     for node in workflow['nodes']:
         if node['type'] == 'Note':
             continue
+        inputs = dict(node.get('widgets_values_named') or {})
+        inputs.pop('upload', None)  # UI-only Load Video control.
         values = iter(node.get('widgets_values', []))
-        inputs = {}
         for socket in node.get('inputs', []):
-            if 'widget' in socket:
+            if 'widget' in socket and socket['name'] not in inputs:
                 inputs[socket['name']] = next(values)
             if socket.get('link') is not None:
                 link = links[socket['link']]
@@ -64,7 +66,7 @@ async def main():
             nodes.NODE_CLASS_MAPPINGS[cls.GET_SCHEMA().node_id] = cls
     prompt = prompt_from_workflow(bootstrap.ROOT / 'example_workflows/custom_rig_to_3d.json')
     (inputs / '3d').mkdir(exist_ok=True)
-    video = args.video or bootstrap.ROOT / 'example_workflows/input/hamster.mp4'
+    video = args.video or artifacts / 'hamster.mp4'
     shutil.copy2(video, inputs / video.name)
     prompt['1']['inputs']['file'] = video.name
     character = args.character or bootstrap.ROOT / 'test_outputs/rig_fixtures/animated_character.glb'

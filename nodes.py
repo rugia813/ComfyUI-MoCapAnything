@@ -1,12 +1,10 @@
 from pathlib import Path
-import hashlib
 import os
 import tempfile
 
 import folder_paths
 from comfy_api.latest import io, ui
 
-from .motion import load_reference
 from .pipeline import load_model, capture
 from .preview import skeleton_glb
 from .rig import prepare_rig, animate_rig
@@ -18,16 +16,6 @@ MoCapModel = io.Custom("MOCAPANYTHING_MODEL")
 MoCapReference = io.Custom("MOCAPANYTHING_REFERENCE")
 MoCapMotion = io.Custom("MOCAPANYTHING_MOTION")
 MoCapRig = io.Custom("MOCAPANYTHING_RIG")
-
-
-def reference_path(name):
-    root = Path(folder_paths.get_input_directory()) / "mocapanything"
-    path = root / name
-    if path.suffix.lower() != ".npz" or not folder_paths.is_within_directory(str(root), str(path)):
-        raise ValueError("Select a reference NPZ inside ComfyUI/input/mocapanything.")
-    if not path.is_file():
-        raise FileNotFoundError(f"Reference not found: {path}")
-    return path
 
 
 class LoadMoCapAnything(io.ComfyNode):
@@ -72,33 +60,12 @@ class LoadMoCapAnything(io.ComfyNode):
         return (stat.st_size, stat.st_mtime_ns)
 
 
-class LoadMoCapReference(io.ComfyNode):
-    @classmethod
-    def define_schema(cls):
-        root = Path(folder_paths.get_input_directory()) / "mocapanything"
-        return io.Schema(
-            node_id="MoCapAnything_LoadReference", display_name="Load MoCapAnything Reference", category="MoCapAnything",
-            description="A converted reference skeleton with its matching pose, rotations and DINOv2/joint features.",
-            inputs=[io.Combo.Input("reference_name", options=sorted(p.relative_to(root).as_posix() for p in root.rglob("*.npz") if p.is_file()))],
-            outputs=[MoCapReference.Output("reference")],
-        )
-
-    @classmethod
-    def execute(cls, reference_name):
-        return io.NodeOutput(load_reference(reference_path(reference_name)))
-
-    @classmethod
-    def fingerprint_inputs(cls, reference_name):
-        with reference_path(reference_name).open("rb") as file:
-            return hashlib.file_digest(file, "sha256").hexdigest()
-
-
 class CaptureMoCapAnything(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
             node_id="MoCapAnything_Capture", display_name="MoCapAnything Capture", category="MoCapAnything",
-            description="Capture motion from video frames. Connect a foreground mask from ComfyUI's Remove Background node when subject isolation is needed.",
+            description="Capture motion from video frames. Connect a ComfyUI foreground mask when subject isolation is needed.",
             inputs=[MoCapModel.Input("model"), io.ClipVision.Input("clip_vision"), MoCapReference.Input("reference"),
                     io.Image.Input("images"), io.Float.Input("fps", default=30.0, min=0.01, max=1000.0, step=0.01),
                     io.Int.Input("batch_size", default=8, min=1, max=4096, advanced=True),

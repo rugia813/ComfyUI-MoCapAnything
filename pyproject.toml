@@ -5,8 +5,6 @@ description = "MoCapAnything V2 video-to-rig animation for ComfyUI"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 dependencies = [
-    "torch",
-    "torchvision",
     "numpy>=1.25.0",
     "scipy",
     "Pillow>=10.1.0",

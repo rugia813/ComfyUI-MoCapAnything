@@ -1,7 +1,5 @@
 # Install with the same Python environment as ComfyUI.
-# Keep ComfyUI's platform-specific torch/torchvision builds when already installed.
-torch
-torchvision
+# ComfyUI provides its hardware-specific PyTorch installation.
 numpy>=1.25.0
 scipy
 Pillow>=10.1.0

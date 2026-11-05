@@ -42,11 +42,11 @@
         }
       },
       "widgets_values": [
-        "wulin2.mp4",
+        "",
         "image"
       ],
       "widgets_values_named": {
-        "file": "wulin2.mp4",
+        "file": "",
         "upload": "image"
       },
       "color": "#232",
@@ -205,10 +205,10 @@
         }
       },
       "widgets_values": [
-        "mocapanything\\mocapanything_v2.safetensors"
+        "video2pos2rot_epoch60.pt"
       ],
       "widgets_values_named": {
-        "model_name": "mocapanything\\mocapanything_v2.safetensors"
+        "model_name": "video2pos2rot_epoch60.pt"
       },
       "color": "#223",
       "bgcolor": "#335"
@@ -530,12 +530,6 @@
           "name": "clip_vision",
           "type": "CLIP_VISION",
           "link": 12
-        },
-        {
-          "name": "motion_3d",
-          "shape": 7,
-          "type": "FILE_3D",
-          "link": null
         }
       ],
       "outputs": [
@@ -714,13 +708,13 @@
         }
       },
       "widgets_values": [
-        "3d/rigged_00002.glb",
+        "",
         "",
         512,
         512
       ],
       "widgets_values_named": {
-        "model_file": "3d/rigged_00002.glb",
+        "model_file": "",
         "viewport_state": "",
         "width": 512,
         "height": 512
@@ -1180,7 +1174,7 @@
         "models": [
           {
             "name": "sam3.1_multiplex_fp16.safetensors",
-            "url": "https://huggingface.co/Comfy-Org/sam3.1/resolve/main/checkpoints/sam3.1_multiplex_fp16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/sam3.1/resolve/main/sam3.1_multiplex_fp16.safetensors",
             "directory": "checkpoints"
           }
         ],
