@@ -3,14 +3,14 @@ import hashlib
 import os
 import tempfile
 
-import numpy as np
 import folder_paths
 from comfy_api.latest import io, ui
 
-from .motion import load_reference, write_bvh
+from .motion import load_reference
 from .pipeline import load_model, capture
 from .preview import skeleton_glb
 from .rig import prepare_rig, animate_rig
+from .metadata import execution_metadata
 from .tools.convert_checkpoint import convert as convert_checkpoint
 
 
@@ -98,7 +98,7 @@ class CaptureMoCapAnything(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="MoCapAnything_Capture", display_name="MoCapAnything Capture", category="MoCapAnything",
-            description="Capture root-relative joint motion from an IMAGE frame batch. Use DINOv2-Large in CLIP Vision Loader. Optional foreground masks use white=subject.",
+            description="Capture motion from video frames. Connect a foreground mask from ComfyUI's Remove Background node when subject isolation is needed.",
             inputs=[MoCapModel.Input("model"), io.ClipVision.Input("clip_vision"), MoCapReference.Input("reference"),
                     io.Image.Input("images"), io.Float.Input("fps", default=30.0, min=0.01, max=1000.0, step=0.01),
                     io.Int.Input("batch_size", default=8, min=1, max=4096, advanced=True),
@@ -112,46 +112,13 @@ class CaptureMoCapAnything(io.ComfyNode):
         return io.NodeOutput(capture(model, clip_vision, reference, images, fps, batch_size, chunk_size, foreground_mask))
 
 
-class SaveMoCapMotion(io.ComfyNode):
-    @classmethod
-    def define_schema(cls):
-        return io.Schema(
-            node_id="MoCapAnything_SaveMotion", display_name="Save MoCapAnything Motion", category="MoCapAnything",
-            inputs=[MoCapMotion.Input("motion"), io.String.Input("filename_prefix", default="mocapanything/motion")],
-            outputs=[io.String.Output("bvh_path"), io.String.Output("npz_path")], is_output_node=True,
-            description="Save BVH animation and numeric NPZ motion inside ComfyUI/output, preserving frame rate and skeleton units.",
-        )
-
-    @classmethod
-    def execute(cls, motion, filename_prefix="mocapanything/motion"):
-        output = folder_paths.get_output_directory()
-        # Check before the native helper creates directories, including symlinks.
-        if not folder_paths.is_within_directory(output, os.path.join(output, filename_prefix)):
-            raise ValueError("filename_prefix must stay inside ComfyUI/output.")
-        directory, filename, counter, _, _ = folder_paths.get_save_image_path(filename_prefix, output)
-        while True:
-            base = Path(directory) / f"{filename}_{counter:05d}"
-            bvh_path, npz_path = Path(str(base) + ".bvh"), Path(str(base) + ".npz")
-            if not bvh_path.exists() and not npz_path.exists():
-                break
-            counter += 1
-        # Exclusive creation prevents overwriting existing output files.
-        with bvh_path.open("x", encoding="utf8", newline="\n") as file:
-            write_bvh(file, motion)
-        with npz_path.open("xb") as file:
-            np.savez_compressed(file, positions=motion.positions, rot6d=motion.rotations,
-                                parents=motion.reference.parents, offsets=motion.reference.offsets,
-                                names=np.asarray(motion.reference.names), fps=motion.fps)
-        return io.NodeOutput(str(bvh_path), str(npz_path), ui=ui.PreviewText(str(bvh_path)))
-
-
 class PrepareMoCapRig(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
             node_id="MoCapAnything_PrepareRig", display_name="Prepare MoCapAnything Rig Reference", category="MoCapAnything",
             is_experimental=True,
-            description="Build a reference from a rigged FBX/GLB/glTF rest pose. Requires Blender 4.2+, native T5-base CLIP and DINOv2-Large. Single-rest-pose scale/static-joint estimation differs from upstream's animation-dataset preparation.",
+            description="Build a reference from a skinned character. Embedded skeletal animation improves the reference; a static rig uses its rest pose.",
             inputs=[io.File3DAny.Input("model_3d"), io.Clip.Input("clip"), io.ClipVision.Input("clip_vision"),
                     io.Combo.Input("forward_axis", options=["+Z", "-Z", "+X", "-X"], default="+Z",
                                    tooltip="Character's facing direction in the native 3D viewer's Y-up coordinates.")],
@@ -160,7 +127,11 @@ class PrepareMoCapRig(io.ComfyNode):
 
     @classmethod
     def execute(cls, model_3d, clip, clip_vision, forward_axis="+Z"):
-        return io.NodeOutput(*prepare_rig(model_3d, clip, clip_vision, forward_axis))
+        reference, rig, image = prepare_rig(model_3d, clip, clip_vision, forward_axis)
+        if not rig.metadata['has_motion']:
+            return io.NodeOutput(reference, rig, image, ui=ui.PreviewText(
+                'Static rig: using its rest pose as the reference. Embed skeletal animation in the character file for a motion-based reference.'))
+        return io.NodeOutput(reference, rig, image)
 
 
 class AnimateMoCapRig(io.ComfyNode):
@@ -168,14 +139,15 @@ class AnimateMoCapRig(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="MoCapAnything_AnimateRig", display_name="Animate MoCapAnything Rig", category="MoCapAnything",
-            description="Apply captured rotations to the same prepared rig, preserving its mesh and skin weights. Connect model_3d to Preview 3D (Advanced) or Save 3D.",
+            description="Apply captured rotations to the same prepared rig, preserving its mesh and skin weights.",
             inputs=[MoCapMotion.Input("motion"), MoCapRig.Input("rig")],
+            hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo],
             outputs=[io.File3DGLB.Output("model_3d")],
         )
 
     @classmethod
     def execute(cls, motion, rig):
-        return io.NodeOutput(animate_rig(motion, rig))
+        return io.NodeOutput(animate_rig(motion, rig, execution_metadata(cls.hidden)))
 
 
 class MoCapSkeleton3D(io.ComfyNode):
@@ -183,10 +155,11 @@ class MoCapSkeleton3D(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="MoCapAnything_Skeleton3D", display_name="MoCapAnything Motion to 3D Skeleton", category="MoCapAnything",
-            description="Animated GLB bone geometry using the same rotations and offsets as BVH. Connect to Preview 3D (Advanced). No Blender required.",
+            description="Animated GLB bone geometry using the captured rotations and skeleton offsets. Connect to Preview 3D (Advanced). No Blender required.",
             inputs=[MoCapMotion.Input("motion")], outputs=[io.File3DGLB.Output("model_3d")],
+            hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo],
         )
 
     @classmethod
     def execute(cls, motion):
-        return io.NodeOutput(skeleton_glb(motion))
+        return io.NodeOutput(skeleton_glb(motion, execution_metadata(cls.hidden)))

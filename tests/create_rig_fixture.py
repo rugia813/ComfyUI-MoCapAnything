@@ -40,4 +40,13 @@ arm.matrix_world = Matrix.Translation((1, -0.5, 0.2)) @ Matrix.Rotation(0.2, 4, 
 bpy.ops.export_scene.gltf(filepath=str(out / 'character.glb'), export_format='GLB', export_animations=False)
 bpy.ops.export_scene.gltf(filepath=str(out / 'character.gltf'), export_format='GLTF_SEPARATE', export_animations=False)
 bpy.ops.export_scene.fbx(filepath=str(out / 'character.fbx'), add_leaf_bones=False, bake_anim=False)
+head = arm.pose.bones['Head']
+head.rotation_mode = 'QUATERNION'
+head.rotation_quaternion = (1, 0, 0, 0)
+head.keyframe_insert('rotation_quaternion', frame=1)
+head.rotation_quaternion = (0.9238795, 0, 0, 0.3826834)
+head.keyframe_insert('rotation_quaternion', frame=10)
+bpy.context.scene.frame_start, bpy.context.scene.frame_end = 1, 10
+bpy.ops.export_scene.fbx(filepath=str(out / 'animated_character.fbx'), add_leaf_bones=False, bake_anim=True)
+bpy.ops.export_scene.gltf(filepath=str(out / 'animated_character.glb'), export_format='GLB', export_animations=True)
 print('RIG_FIXTURES_CREATED')

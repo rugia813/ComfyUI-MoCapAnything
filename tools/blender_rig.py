@@ -13,10 +13,12 @@ from mathutils import Matrix, Vector
 def prepare(directory, config):
     source = Path(config['source'])
     if source.suffix.lower() == '.fbx':
-        bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
+        bpy.ops.import_scene.fbx(filepath=str(source), use_anim=True)
     else:
         bpy.ops.import_scene.gltf(filepath=str(source))
-    arms = [obj for obj in bpy.context.scene.objects if obj.type == 'ARMATURE']
+    arms = [obj for obj in bpy.context.scene.objects if obj.type == 'ARMATURE' and
+            any(mesh.type == 'MESH' and any(mod.type == 'ARMATURE' and mod.object == obj for mod in mesh.modifiers)
+                for mesh in bpy.context.scene.objects)]
     if not arms:
         raise ValueError(
             f"No skeleton was imported from {source.name!r}. Prepare Rig Reference requires an already-rigged "
@@ -25,7 +27,7 @@ def prepare(directory, config):
             "Being visible in Load 3D (Advanced) does not mean a model contains a rig."
         )
     if len(arms) != 1:
-        raise ValueError(f"Expected one skeleton; found {len(arms)}. Export a single rigged character.")
+        raise ValueError(f"Expected one skinned skeleton; found {len(arms)}. Export a single rigged character.")
     arm = arms[0]
     linear = np.array(arm.matrix_world.to_3x3())
     metric = linear.T @ linear
@@ -38,21 +40,6 @@ def prepare(directory, config):
     roots = [bone for bone in arm.data.bones if bone.parent is None]
     if len(roots) != 1:
         raise ValueError('The skeleton must have exactly one root bone. Parent disconnected bone chains before exporting.')
-    for obj in list(bpy.context.scene.objects):
-        if obj.type in {'CAMERA', 'LIGHT'} or (obj.type == 'MESH' and obj not in meshes):
-            bpy.data.objects.remove(obj, do_unlink=True)
-            continue
-        obj.animation_data_clear()
-        if obj.type == 'MESH' and obj.data.shape_keys is not None:
-            obj.data.shape_keys.animation_data_clear()
-        for constraint in list(obj.constraints):
-            obj.constraints.remove(constraint)
-    for bone in arm.pose.bones:
-        for constraint in list(bone.constraints):
-            bone.constraints.remove(constraint)
-        bone.matrix_basis = Matrix.Identity(4)
-    bpy.context.scene.frame_set(1)
-    bpy.context.view_layer.update()
     ordered = []
 
     def visit(bone):
@@ -77,10 +64,39 @@ def prepare(directory, config):
                 'basis': [list(row) for row in basis], 'armature': arm.name,
                 'rest': [[list(row) for row in matrix] for matrix in rest]}
     (directory / 'rig.json').write_text(json.dumps(metadata), encoding='utf8')
-    bpy.ops.file.pack_all()
-    bpy.ops.wm.save_as_mainfile(filepath=str(directory / 'rig.blend'))
 
-    # Render the exact rest pose used above; camera coordinates are Y-up, facing +Z.
+    motion_data = arm.animation_data
+    action = motion_data.action if motion_data else None
+    strips = [strip for track in motion_data.nla_tracks for strip in track.strips] if motion_data else []
+    if action:
+        first, last = int(math.ceil(action.frame_range[0])), int(math.floor(action.frame_range[1]))
+    elif strips:
+        first, last = int(min(s.frame_start for s in strips)), int(max(s.frame_end for s in strips))
+    else:
+        first = last = 1
+        for bone in arm.pose.bones:
+            bone.matrix_basis = Matrix.Identity(4)
+    all_positions, all_rotations = [], []
+    for frame in range(first, last + 1):
+        bpy.context.scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        posed = [basis @ arm.matrix_world @ arm.pose.bones[bone.name].matrix for bone in ordered]
+        root = posed[0].translation
+        all_positions.append([list(matrix.translation - root) for matrix in posed])
+        global_delta = [(matrix.to_3x3() @ rest[j].to_3x3().inverted()).normalized()
+                        for j, matrix in enumerate(posed)]
+        local_delta = [delta if parents[j] < 0 else global_delta[parents[j]].inverted() @ delta
+                       for j, delta in enumerate(global_delta)]
+        all_rotations.append([[*matrix[0], *matrix[1]] for matrix in local_delta])
+    all_positions = np.asarray(all_positions, dtype=np.float32)
+    all_rotations = np.asarray(all_rotations, dtype=np.float32)
+    has_motion = bool(last > first and (np.max(np.abs(all_positions - all_positions[:1])) > 1e-6 or
+                                        np.max(np.abs(all_rotations - all_rotations[:1])) > 1e-6))
+    np.savez(directory / 'motion_reference.npz', positions=all_positions, rot6d=all_rotations)
+    metadata['has_motion'] = has_motion
+    (directory / 'rig.json').write_text(json.dumps(metadata), encoding='utf8')
+    bpy.context.scene.frame_set(first)
+    # Render the reference pose for DINOv2.
     points = [basis @ obj.matrix_world @ Vector(corner) for obj in meshes for corner in obj.bound_box]
     low = Vector(tuple(min(p[a] for p in points) for a in range(3)))
     high = Vector(tuple(max(p[a] for p in points) for a in range(3)))
@@ -119,6 +135,23 @@ def prepare(directory, config):
     scene.render.image_settings.color_mode = 'RGBA'
     scene.render.filepath = str(directory / 'reference.png')
     bpy.ops.render.render(write_still=True)
+    for obj in list(bpy.context.scene.objects):
+        if obj.type in {'CAMERA', 'LIGHT'} or (obj.type == 'MESH' and obj not in meshes) or (obj.type == 'ARMATURE' and obj is not arm):
+            bpy.data.objects.remove(obj, do_unlink=True)
+            continue
+        obj.animation_data_clear()
+        if obj.type == 'MESH' and obj.data.shape_keys is not None:
+            obj.data.shape_keys.animation_data_clear()
+        for constraint in list(obj.constraints):
+            obj.constraints.remove(constraint)
+    for bone in arm.pose.bones:
+        for constraint in list(bone.constraints):
+            bone.constraints.remove(constraint)
+        bone.matrix_basis = Matrix.Identity(4)
+    bpy.context.scene.frame_set(1)
+    bpy.context.view_layer.update()
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(filepath=str(directory / 'rig.blend'))
 
 
 def animate(directory, config):

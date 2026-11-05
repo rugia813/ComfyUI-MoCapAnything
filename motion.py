@@ -3,7 +3,6 @@ from pathlib import Path
 import re
 
 import numpy as np
-from scipy.spatial.transform import Rotation
 
 
 @dataclass
@@ -91,34 +90,3 @@ def rotation_matrices(rotations):
     second = second - (first * second).sum(axis=-1, keepdims=True) * first
     second = second / np.maximum(np.linalg.norm(second, axis=-1, keepdims=True), 1e-12)
     return np.stack((first, second, np.cross(first, second)), axis=-2)
-
-
-def write_bvh(stream, motion):
-    ref = motion.reference
-    children = [[] for _ in ref.names]
-    for joint, parent in enumerate(ref.parents[1:], 1):
-        children[parent].append(joint)
-    order = []
-
-    def joint_lines(joint, depth):
-        order.append(joint)
-        indent = "\t" * depth
-        kind = "ROOT" if joint == 0 else "JOINT"
-        stream.write(f"{indent}{kind} {ref.names[joint]}\n{indent}{{\n")
-        stream.write(f"{indent}\tOFFSET " + " ".join(f"{v:.8f}" for v in ref.offsets[joint]) + "\n")
-        channels = "6 Xposition Yposition Zposition Zrotation Yrotation Xrotation" if joint == 0 else "3 Zrotation Yrotation Xrotation"
-        stream.write(f"{indent}\tCHANNELS {channels}\n")
-        for child in children[joint]:
-            joint_lines(child, depth + 1)
-        if not children[joint]:
-            stream.write(f"{indent}\tEnd Site\n{indent}\t{{\n{indent}\t\tOFFSET 0 0 0\n{indent}\t}}\n")
-        stream.write(f"{indent}}}\n")
-
-    stream.write("HIERARCHY\n")
-    joint_lines(0, 0)
-    matrices = rotation_matrices(motion.rotations)
-    angles = Rotation.from_matrix(matrices.reshape(-1, 3, 3)).as_euler("ZYX", degrees=True).reshape(*motion.rotations.shape[:2], 3)
-    stream.write(f"MOTION\nFrames: {len(angles)}\nFrame Time: {1 / motion.fps:.10f}\n")
-    for frame in angles:
-        # The released model predicts root-relative motion, not world translation.
-        stream.write("0 0 0 " + " ".join(f"{value:.8f}" for value in frame[order].reshape(-1)) + "\n")

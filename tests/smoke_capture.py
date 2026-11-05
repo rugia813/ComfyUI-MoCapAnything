@@ -11,14 +11,13 @@ import folder_paths
 import comfy.clip_vision
 from comfy_api.latest import InputImpl
 
-from mocap_extension.nodes import LoadMoCapAnything, CaptureMoCapAnything, SaveMoCapMotion
-from mocap_extension.motion import load_reference, read_bvh_skeleton
+from mocap_extension.nodes import LoadMoCapAnything, CaptureMoCapAnything
+from mocap_extension.motion import load_reference
 
 
 def run(args):
     torch.set_grad_enabled(False)
     args.output.mkdir(parents=True, exist_ok=True)
-    folder_paths.set_output_directory(str(args.output.resolve()))
     folder_paths.add_model_folder_path("diffusion_models", str(args.checkpoint.parent.resolve()))
     components = InputImpl.VideoFromFile(str(args.video)).get_components()
     model = LoadMoCapAnything.execute(args.checkpoint.name).result[0]
@@ -27,19 +26,14 @@ def run(args):
     start = time.perf_counter()
     motion = CaptureMoCapAnything.execute(model, clip, reference, components.images, float(components.frame_rate), 8, 64).result[0]
     elapsed = time.perf_counter() - start
-    result = SaveMoCapMotion.execute(motion, "smoke/hamster").result
     assert len(motion.positions) == len(components.images)
     assert np.isfinite(motion.positions).all() and np.isfinite(motion.rotations).all()
-    names, parents, offsets = read_bvh_skeleton(result[0])
-    assert names == reference.names
-    np.testing.assert_equal(parents, reference.parents)
-    np.testing.assert_allclose(offsets, reference.offsets, atol=1e-7)
-    report = {"frames": len(motion.positions), "joints": len(names), "fps": motion.fps,
-              "capture_seconds": elapsed, "bvh": result[0], "npz": result[1], "device": str(model.load_device),
+    report = {"frames": len(motion.positions), "joints": len(reference.names), "fps": motion.fps,
+              "capture_seconds": elapsed, "device": str(model.load_device),
               "encoder_dtype": str(clip.dtype), "peak_cuda_mib": torch.cuda.max_memory_allocated() / 1024**2 if torch.cuda.is_available() else None}
     (args.output / "smoke_result.json").write_text(json.dumps(report, indent=2), encoding="utf8")
     print(json.dumps(report, indent=2), flush=True)
-    print("VIDEO_TO_BVH_PASSED", flush=True)
+    print("VIDEO_CAPTURE_PASSED", flush=True)
 
 
 if __name__ == "__main__":

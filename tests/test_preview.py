@@ -44,8 +44,11 @@ class PreviewTests(unittest.TestCase):
             matrices = Rotation.from_euler('Z', [[0], [90], [180]], degrees=True).as_matrix()
             rot = np.repeat(matrices[:, None, :2, :].reshape(3, 1, 6), 2, axis=1)
             motion = Motion(ref, np.zeros((3, 2, 3)), rot, 23.976)
-            model = skeleton_glb(motion)
+            metadata = {"prompt": {"6": {"class_type": "MoCapAnything_Capture"}},
+                        "workflow": {"nodes": [{"id": 6}]}}
+            model = skeleton_glb(motion, metadata)
             doc, data = read_glb(model.get_bytes())
+            self.assertEqual(doc["asset"]["extras"]["comfyui"], metadata)
             self.assertEqual(doc['nodes'][1]['translation'], [0, 2, 0])
             for sampler in doc['animations'][0]['samplers']:
                 np.testing.assert_allclose(accessor(doc, data, sampler['input']).ravel(), np.arange(3)/motion.fps, atol=1e-7)
@@ -67,7 +70,7 @@ class PreviewTests(unittest.TestCase):
 
     def test_reject_cross_rig_binding(self):
         rig = PreparedRig(b'', {}, object(), 'unused')
-        with self.assertRaisesRegex(ValueError, 'retargeting'):
+        with self.assertRaisesRegex(ValueError, 'same prepared rig'):
             animate_rig(Motion(None, None, None, 30), rig)
 
 

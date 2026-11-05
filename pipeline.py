@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from PIL import Image
-from transformers import BitImageProcessor
+from transformers import BitImageProcessor, Dinov2Config, Dinov2Model
 
 import comfy.model_management as mm
 import comfy.model_patcher
@@ -103,15 +103,29 @@ def encode_images(clip_vision, images, batch_size=8, masks=None, progress=None):
     processor = BitImageProcessor(size={"shortest_edge": 256}, crop_size={"height": 224, "width": 224},
                                   image_mean=[0.485, 0.456, 0.406], image_std=[0.229, 0.224, 0.225], resample=Image.Resampling.BICUBIC)
     progress = progress if progress is not None else comfy.utils.ProgressBar(len(images))
+    prepared = list(prepare_frames(images, masks))
+    # The native ComfyUI DINOv2 backbone produces materially different tokens
+    # from upstream's Hugging Face Dinov2Model even with identical weights and
+    # pixel values. Reuse the loaded checkpoint, but run the upstream backbone.
+    config = Dinov2Config(**clip_vision.config,
+                         intermediate_size=clip_vision.config["hidden_size"] * clip_vision.config["mlp_ratio"])
+    with torch.device("meta"):
+        encoder = Dinov2Model(config)
+    encoder.load_state_dict(clip_vision.get_sd(), strict=True, assign=True)
+    dtype = clip_vision.dtype if clip_vision.load_device.type != "cpu" else torch.float32
+    encoder = encoder.to(device=clip_vision.load_device, dtype=dtype).eval()
     features = []
-    for start in range(0, len(images), batch_size):
-        mm.throw_exception_if_processing_interrupted()
-        mm.load_model_gpu(clip_vision.patcher)
-        end = min(start + batch_size, len(images))
-        chunk_masks = masks if masks is None or len(masks) == 1 else masks[start:end]
-        pixels = processor(images=list(prepare_frames(images[start:end], chunk_masks)), return_tensors="pt")["pixel_values"]
-        pixels = pixels.to(device=clip_vision.load_device, dtype=clip_vision.dtype)
-        outputs = clip_vision.model(pixel_values=pixels, intermediate_output=None)
-        features.append(outputs[0].detach().to(device="cpu", dtype=torch.float32))
-        progress.update(end - start)
+    try:
+        with torch.inference_mode():
+            for start in range(0, len(images), batch_size):
+                mm.throw_exception_if_processing_interrupted()
+                end = min(start + batch_size, len(images))
+                pixels = processor(images=prepared[start:end], return_tensors="pt")["pixel_values"]
+                pixels = pixels.to(device=clip_vision.load_device, dtype=dtype)
+                hidden = encoder(pixel_values=pixels).last_hidden_state
+                features.append(hidden.detach().to(device="cpu", dtype=torch.float32))
+                progress.update(end - start)
+    finally:
+        del encoder
+        mm.soft_empty_cache()
     return torch.cat(features)

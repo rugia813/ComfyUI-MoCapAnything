@@ -18,6 +18,7 @@ from comfy.text_encoders.sa_t5 import SAT5Model
 from .motion import Reference, rotation_matrices
 from .pipeline import encode_images
 from .blender import find_blender
+from .metadata import embed_glb_metadata
 
 
 @dataclass
@@ -118,45 +119,63 @@ def prepare_rig(model_3d, clip, clip_vision, forward_axis):
             source = str(Path(model_3d.get_source()).resolve())
         else:
             source = model_3d.save_to(str(directory / f"source.{model_3d.format}"))
-        blender = run_blender(find_blender(), directory, {"mode": "prepare", "source": source, "forward_axis": forward_axis})
+        blender = run_blender(find_blender(), directory, {"mode": "prepare", "source": source,
+                                                   "forward_axis": forward_axis})
         metadata = json.loads((directory / "rig.json").read_text(encoding="utf8"))
         names = metadata['names']
         parents = np.array(metadata['parents'], dtype=np.int64)
-        positions = np.array(metadata['positions'], dtype=np.float32)
         offsets = np.array(metadata['offsets'], dtype=np.float32)
+        with np.load(directory / 'motion_reference.npz', allow_pickle=False) as sampled:
+            positions = sampled['positions'].astype(np.float32)
+            rotations = sampled['rot6d'].astype(np.float32)
+        if not metadata['has_motion']:
+            print('[MoCapAnything] This rig has no animation. Building its reference from the rest pose. '
+                  'Embed skeletal animation in the character file for a motion-based reference.')
         with Image.open(directory / "reference.png") as image:
             rgba = torch.from_numpy(np.array(image.convert('RGBA'), dtype=np.float32) / 255)[None]
         rgb = rgba[..., :3] * rgba[..., 3:] + 1 - rgba[..., 3:]
         image_features = encode_images(clip_vision, rgb, masks=rgba[..., 3])[0].numpy()
         semantic_features = joint_features(clip, names)
-        # Upstream measures all training motions over 12 yaws. Here only the rest pose is available.
+        # Match upstream's per-species scale over motion and yaw views.
         yaw = np.arange(12) * np.pi / 6
-        rotated_x = positions[:, 0, None] * np.cos(yaw) + positions[:, 2, None] * np.sin(yaw)
-        rotated_z = -positions[:, 0, None] * np.sin(yaw) + positions[:, 2, None] * np.cos(yaw)
-        scale = float(max(np.abs(rotated_x).max(), np.abs(rotated_z).max(), np.abs(positions[:, 1]).max()))
+        rotated_x = positions[..., 0, None] * np.cos(yaw) + positions[..., 2, None] * np.sin(yaw)
+        rotated_z = -positions[..., 0, None] * np.sin(yaw) + positions[..., 2, None] * np.cos(yaw)
+        scale = float(max(np.abs(rotated_x).max(), np.abs(rotated_z).max(), np.abs(positions[..., 1]).max()))
         if scale <= 1e-8:
             raise ValueError("Rig has no spatial extent. Use a rig with distinct joint positions.")
         hop, edge = topology(parents)
-        static_pos = np.zeros(len(names), dtype=bool)
-        static_pos[0] = True
+        if metadata['has_motion']:
+            cardinal = np.arange(4) * np.pi / 2
+            px = positions[..., 0, None] * np.cos(cardinal) + positions[..., 2, None] * np.sin(cardinal)
+            pz = -positions[..., 0, None] * np.sin(cardinal) + positions[..., 2, None] * np.cos(cardinal)
+            py = np.broadcast_to(positions[..., 1, None], px.shape)
+            viewed_positions = np.stack((px, py, pz), axis=-1)
+            static_pos = np.max(np.abs(viewed_positions - viewed_positions[:1, :, :1]), axis=(0, 2, 3)) < 1e-6
+            static_rot = np.max(np.abs(rotations - rotations[:1]), axis=(0, 2)) < 1e-6
+            # Upstream's twelve yaw views rotate the BVH root, so it is never rotation-static.
+            static_rot[0] = False
+        else:
+            static_pos = np.zeros(len(names), dtype=bool)
+            static_pos[0] = True
+            static_rot = np.zeros(len(names), dtype=bool)
         ref = Reference(names, parents, offsets, scale, {
-            'ref_position': positions / scale,
-            'ref_rot6d_a': np.tile([1, 0, 0, 0, 1, 0], (len(names), 1)).astype(np.float32),
+            'ref_position': positions[0] / scale,
+            'ref_rot6d_a': rotations[0],
             'ref_image_embed': image_features, 'joint_t5embed': semantic_features,
             'graph_hop': hop, 'graph_edge': edge, 'static_pos_joint_mask': static_pos,
-            'static_rot_joint_mask': np.zeros(len(names), dtype=bool)})
+            'static_rot_joint_mask': static_rot})
         rig = PreparedRig((directory / "rig.blend").read_bytes(), metadata, ref, blender)
     return ref, rig, rgb
 
 
-def animate_rig(motion, rig):
+def animate_rig(motion, rig, metadata=None):
     if motion.reference is not rig.reference:
-        raise ValueError("Connect motion captured with this Prepare Rig Reference node's reference. Unrelated rigs require retargeting.")
+        raise ValueError('Connect motion captured with this same prepared rig reference.')
     with tempfile.TemporaryDirectory(prefix="mocap_animate_") as temp:
         directory = Path(temp)
         (directory / "rig.blend").write_bytes(rig.blend)
         (directory / "rig.json").write_text(json.dumps(rig.metadata), encoding="utf8")
         np.save(directory / "rotations.npy", rotation_matrices(motion.rotations), allow_pickle=False)
         run_blender(rig.blender, directory, {"mode": "animate", "fps": motion.fps})
-        result = (directory / "animated.glb").read_bytes()
+        result = embed_glb_metadata((directory / "animated.glb").read_bytes(), metadata)
     return Types.File3D(BytesIO(result), "glb")

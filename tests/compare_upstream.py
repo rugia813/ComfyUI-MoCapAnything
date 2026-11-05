@@ -10,7 +10,7 @@ import torch
 from safetensors.torch import load_file
 
 from mocap_extension.motion import load_reference
-from mocap_extension.pipeline import make_batch
+from mocap_extension.pipeline import make_batch, encode_images
 from mocap_extension.model.network import MoCapAnything
 
 
@@ -29,10 +29,23 @@ def run(args):
     model.load_state_dict(state)
     reference = load_reference(args.reference)
     generator = torch.Generator().manual_seed(42)
+    video_features = None
+    if args.video:
+        import comfy.clip_vision
+        from comfy_api.latest import InputImpl
+
+        vision = comfy.clip_vision.load(str(args.clip_vision))
+        frames = InputImpl.VideoFromFile(str(args.video)).get_components().images
+        if len(frames) < max(args.frames):
+            raise ValueError(f'Video has {len(frames)} frames; need {max(args.frames)}.')
+        video_features = encode_images(vision, frames[:max(args.frames)], batch_size=8)
     reports = []
     for frames in args.frames:
-        features = torch.from_numpy(reference.tensors["ref_image_embed"])[None].repeat(frames, 1, 1)
-        features += torch.randn(features.shape, generator=generator) * 0.1
+        if video_features is None:
+            features = torch.from_numpy(reference.tensors["ref_image_embed"])[None].repeat(frames, 1, 1)
+            features += torch.randn(features.shape, generator=generator) * 0.1
+        else:
+            features = video_features[:frames]
         batch = make_batch(reference, features, args.device)
         kwargs = dict(seq_len=frames, selfatt_temporal_layer_flag=[], selfatt_temporal=True,
                       crossatt2_temporal=True, selfatt_slidwindow=5, crossatt2_slidwindow=5)
@@ -76,4 +89,9 @@ if __name__ == "__main__":
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"])
     parser.add_argument("--frames", nargs="+", type=int, default=[1, 8, 97])
-    run(parser.parse_args())
+    parser.add_argument("--video", type=Path, help="Use DINOv2 features from real video frames rather than synthetic features")
+    parser.add_argument("--clip-vision", type=Path, help="DINOv2-Large checkpoint for --video")
+    args = parser.parse_args()
+    if args.video and not args.clip_vision:
+        parser.error('--video requires --clip-vision')
+    run(args)

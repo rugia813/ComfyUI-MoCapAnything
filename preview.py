@@ -7,9 +7,10 @@ from comfy_api.latest import Types
 from comfy_extras.sam3d_body.export.glb_shared import GLBWriter, quat_sign_fix_per_joint
 
 from .motion import rotation_matrices
+from .metadata import embed_glb_metadata
 
 
-def skeleton_glb(motion):
+def skeleton_glb(motion, metadata=None):
     ref = motion.reference
     matrices = rotation_matrices(motion.rotations)
     quats = Rotation.from_matrix(matrices.reshape(-1, 3, 3)).as_quat().reshape(len(matrices), len(ref.names), 4)
@@ -51,4 +52,4 @@ def skeleton_glb(motion):
             "materials": [{"doubleSided": True, "pbrMetallicRoughness": {
                 "baseColorFactor": [0.12, 0.65, 0.95, 1], "metallicFactor": 0, "roughnessFactor": 0.7}}],
             "animations": [animation]}
-    return Types.File3D(BytesIO(writer.to_bytes(gltf)), "glb")
+    return Types.File3D(BytesIO(embed_glb_metadata(writer.to_bytes(gltf), metadata)), "glb")

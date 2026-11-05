@@ -46,3 +46,11 @@ for suffix in ('glb', 'gltf', 'fbx'):
     skeleton_glb(actual).save_to(str(out / f'{suffix}_captured_skeleton.glb'))
     animate_rig(actual, rig).save_to(str(out / f'{suffix}_captured_mesh.glb'))
     print(f'RIG_END_TO_END_PASSED {suffix}', flush=True)
+
+for character in ('animated_character.glb', 'animated_character.fbx'):
+    ref, rig, _ = prepare_rig(Types.File3D(str(out / character)), clip, vision, '+Z')
+    assert rig.metadata['has_motion']
+    assert not ref.tensors['static_rot_joint_mask'][1]
+    assert not ref.tensors['static_rot_joint_mask'][0]
+    assert np.linalg.norm(ref.tensors['ref_rot6d_a'][1] - np.array([1, 0, 0, 0, 1, 0])) < 0.1
+    print(f'ANIMATED_REFERENCE_PASSED {character}', flush=True)

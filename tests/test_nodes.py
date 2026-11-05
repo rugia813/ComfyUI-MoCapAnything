@@ -1,7 +1,6 @@
 import asyncio
 import importlib.util
 import json
-import io as string_io
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,8 +12,8 @@ import torch
 from safetensors.torch import load_file
 from scipy.spatial.transform import Rotation
 
-from mocap_extension.motion import load_reference, Motion, rotation_matrices, write_bvh, read_bvh_skeleton
-from mocap_extension.nodes import LoadMoCapAnything, LoadMoCapReference, CaptureMoCapAnything, SaveMoCapMotion, reference_path
+from mocap_extension.motion import load_reference, rotation_matrices
+from mocap_extension.nodes import LoadMoCapAnything, LoadMoCapReference, reference_path
 from mocap_extension.pipeline import prepare_frames, make_batch
 
 
@@ -50,7 +49,7 @@ class NodeTests(unittest.TestCase):
         spec.loader.exec_module(extension)
         entry = asyncio.run(extension.comfy_entrypoint())
         classes = asyncio.run(entry.get_node_list())
-        self.assertEqual(len(classes), 7)
+        self.assertEqual(len(classes), 6)
         for cls in classes:
             schema = cls.define_schema()
             self.assertTrue(schema.node_id.startswith("MoCapAnything_"))
@@ -58,7 +57,7 @@ class NodeTests(unittest.TestCase):
 
     def test_frontend_workflow_links(self):
         for path in (bootstrap.ROOT / 'example_workflows').glob('*.json'):
-            workflow = json.loads(path.read_text())
+            workflow = json.loads(path.read_text(encoding="utf8"))
             nodes = {node["id"]: node for node in workflow["nodes"]}
             for link_id, source, output, destination, input_slot, socket_type in workflow["links"]:
                 input = nodes[destination]["inputs"][input_slot]
@@ -113,7 +112,7 @@ class NodeTests(unittest.TestCase):
         np.testing.assert_equal(batch["ancestor_mask"].numpy(), [[[True, False], [True, True]]])
         self.assertEqual(batch["graph_hop"].dtype, torch.int64)
 
-    def test_foreground_mask_crop_and_broadcast(self):
+    def test_foreground_mask_crop_and_unmasked_frames(self):
         images = torch.zeros(2, 20, 30, 3)
         masks = torch.zeros(1, 20, 30)
         masks[:, 5:15, 10:20] = 1
@@ -123,41 +122,14 @@ class NodeTests(unittest.TestCase):
         self.assertEqual(frames[0].getpixel((0, 0)), (255, 255, 255))
         self.assertEqual(frames[0].getpixel((6, 6)), (0, 0, 0))
         self.assertEqual(len(list(prepare_frames(images, torch.zeros_like(masks)))), 2)
+        plain = list(prepare_frames(images))
+        self.assertEqual(len(plain), 2)
+        self.assertEqual(plain[0].getpixel((15, 15)), (0, 0, 0))
 
-    def test_bvh_rotation_convention_and_fps(self):
+    def test_rotation_convention(self):
         matrices = Rotation.from_euler("ZYX", [[30, 20, 10], [-40, 15, 60]], degrees=True).as_matrix()
         rotations = matrices[:, :2].reshape(1, 2, 6)
         np.testing.assert_allclose(rotation_matrices(rotations), matrices[None], atol=1e-8)
-        motion = Motion(self.ref, np.zeros((1, 2, 3)), rotations, 23.976)
-        buffer = string_io.StringIO()
-        write_bvh(buffer, motion)
-        lines = buffer.getvalue().splitlines()
-        self.assertIn("Frames: 1", lines)
-        time_line = next(line for line in lines if line.startswith("Frame Time:"))
-        self.assertAlmostEqual(float(time_line.split(":")[1]), 1/23.976, places=9)
-        angles = np.array([float(v) for v in lines[-1].split()][3:]).reshape(2, 3)
-        np.testing.assert_allclose(Rotation.from_euler("ZYX", angles, degrees=True).as_matrix(), matrices, atol=1e-8)
-        path = self.root / "test.bvh"
-        path.write_text(buffer.getvalue())
-        names, parents, offsets = read_bvh_skeleton(path)
-        self.assertEqual(names, self.ref.names)
-        np.testing.assert_equal(parents, self.ref.parents)
-        np.testing.assert_equal(offsets, self.ref.offsets)
-
-    def test_output_containment_dotted_prefix_and_collision(self):
-        motion = Motion(self.ref, np.zeros((2, 2, 3)), np.tile(self.ref.tensors["ref_rot6d_a"], (2, 1, 1)), 30)
-        with patch("folder_paths.get_output_directory", return_value=str(self.output)):
-            with self.assertRaises(ValueError):
-                SaveMoCapMotion.execute(motion, "../outside/motion")
-            self.assertFalse((self.root / "outside").exists())
-            first = SaveMoCapMotion.execute(motion, "nested/my.motion").result
-            second = SaveMoCapMotion.execute(motion, "nested/my.motion").result
-            self.assertNotEqual(first, second)
-            for result in (first, second):
-                self.assertTrue(Path(result[0]).is_file())
-                with np.load(result[1], allow_pickle=False) as data:
-                    self.assertEqual(data["rot6d"].shape, (2, 2, 6))
-                    self.assertEqual(data["fps"], 30)
 
 
 if __name__ == "__main__":

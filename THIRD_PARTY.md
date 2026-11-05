@@ -13,4 +13,4 @@ Weights and reference data are separate downloads and are not included in this s
 - [Google T5-base](https://huggingface.co/google-t5/t5-base), for custom-rig joint-name features
 - [MoCapAnything example data](https://huggingface.co/datasets/kehong/MoCapAnythingV2-data-sample); animal assets derive from Truebones Zoo and retain their own terms.
 
-No BRIA RMBG, SAM2, TripoSG, Gradio, Blender, or upstream training implementation is bundled. Use a separately installed foreground-mask node when needed.
+No BRIA RMBG, SAM2, TripoSG, Gradio, Blender, or upstream training implementation is bundled. The example workflow uses ComfyUI's built-in background removal nodes.

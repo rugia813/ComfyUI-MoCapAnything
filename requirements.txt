@@ -7,4 +7,3 @@ scipy
 Pillow>=10.1.0
 transformers>=4.50.3
 safetensors>=0.4.2
-av>=17.0.0
