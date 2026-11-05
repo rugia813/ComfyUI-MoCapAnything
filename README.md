@@ -29,6 +29,8 @@ Download these five model files:
 | [BiRefNet](https://huggingface.co/Comfy-Org/BiRefNet/blob/main/background_removal/birefnet.safetensors) | `background_removal/birefnet.safetensors` |
 | [SAM3.1](https://huggingface.co/Comfy-Org/sam3.1/blob/main/sam3.1_multiplex_fp16.safetensors) | `checkpoints/sam3.1_multiplex_fp16.safetensors` |
 
+SAM3.1 uses [Meta's SAM License](https://github.com/facebookresearch/sam3/blob/main/LICENSE), separate from this node pack's MIT license. See [THIRD_PARTY.md](THIRD_PARTY.md) for all model licenses.
+
 The first MoCapAnything load converts the `.pt` file to `.safetensors` beside it, so the model folder must be writable and have room for both files. Later loads use the converted file. Restart ComfyUI after installing models.
 
 Install Blender 4.2+. The node finds `blender` on PATH, a normal Windows installation, or `Blender.app` in macOS Applications. For a portable Blender build, put its executable on PATH and restart ComfyUI.
