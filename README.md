@@ -20,8 +20,6 @@ Download the [MoCapAnything V2 checkpoint](https://huggingface.co/kehong/MoCapAn
 
 Download [DINOv2-Large](https://huggingface.co/facebook/dinov2-large/blob/main/model.safetensors) to `ComfyUI/models/clip_vision/dinov2-large.safetensors` and [Google T5-base](https://huggingface.co/google-t5/t5-base/blob/main/model.safetensors) to `ComfyUI/models/text_encoders/t5-base.safetensors`. Restart ComfyUI after installing the node and models.
 
-The example uses ComfyUI's built-in **Load Background Removal Model** and **Remove Background** nodes to make a foreground mask. Put a compatible model such as `birefnet.safetensors` in `ComfyUI/models/background_removal/` and select it in the loader. You can connect any ComfyUI mask to Capture instead, or leave the mask empty to use the original video frames.
-
 Install Blender 4.2+. The node finds `blender` on PATH, a normal Windows installation, or `Blender.app` in macOS Applications. There is no Blender path setting. If you use a portable Blender build, put its executable on PATH and restart ComfyUI.
 
 ## Animate your own character

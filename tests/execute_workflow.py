@@ -10,7 +10,7 @@ import bootstrap
 import folder_paths
 import nodes
 import execution
-from comfy_extras import nodes_video, nodes_load_3d, nodes_save_3d, nodes_bg_removal
+from comfy_extras import nodes_video, nodes_load_3d, nodes_save_3d, nodes_bg_removal, nodes_images, nodes_sam3, nodes_mask
 
 
 def prompt_from_workflow(path):
@@ -55,10 +55,11 @@ async def main():
     folder_paths.set_temp_directory(str(bootstrap.ROOT / "test_outputs/temp"))
     Path(folder_paths.get_temp_directory()).mkdir(exist_ok=True)
     folder_paths.add_model_folder_path("diffusion_models", str(artifacts))
+    folder_paths.add_model_folder_path("checkpoints", str(artifacts / "checkpoints"))
     folder_paths.add_model_folder_path("clip_vision", str(artifacts))
     folder_paths.add_model_folder_path("text_encoders", str(artifacts))
     assert await nodes.load_custom_node(str(bootstrap.ROOT))
-    for module in (nodes_video, nodes_load_3d, nodes_save_3d, nodes_bg_removal):
+    for module in (nodes_video, nodes_load_3d, nodes_save_3d, nodes_bg_removal, nodes_images, nodes_sam3, nodes_mask):
         for cls in await (await module.comfy_entrypoint()).get_node_list():
             nodes.NODE_CLASS_MAPPINGS[cls.GET_SCHEMA().node_id] = cls
     prompt = prompt_from_workflow(bootstrap.ROOT / 'example_workflows/custom_rig_to_3d.json')
@@ -76,6 +77,11 @@ async def main():
     executor = execution.PromptExecutor(EventSink(), cache_type=execution.CacheType.CLASSIC, cache_args={"ram": 0, "ram_inactive": 0})
     await executor.execute_async(prompt, "mocap-test", execute_outputs=outputs)
     assert executor.success, executor.status_messages
+    tracked = await executor.caches.outputs.get("21")
+    assert tracked is not None, "SAM tracking did not run"
+    masks = tracked.outputs[0][0]
+    assert len(masks) == len(executor.caches.outputs.get_local("2").outputs[0][0]), "SAM mask count differs from video frames"
+    assert (masks.flatten(1).sum(dim=1) > 0).all(), "SAM returned an empty subject mask"
     print("COMFY_WORKFLOW_EXECUTION_PASSED", flush=True)
 
 
